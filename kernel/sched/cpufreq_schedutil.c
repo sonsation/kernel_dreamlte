@@ -724,12 +724,7 @@ static int sugov_limits(struct cpufreq_policy *policy)
 
 	mutex_lock(&sg_policy->work_lock);
 
-	if (policy->max < policy->cur)
-		__cpufreq_driver_target(policy, policy->max,
-					CPUFREQ_RELATION_H);
-	else if (policy->min > policy->cur)
-		__cpufreq_driver_target(policy, policy->min,
-					CPUFREQ_RELATION_L);
+	cpufreq_policy_apply_limits(policy);
 
 	mutex_unlock(&sg_policy->work_lock);
 
