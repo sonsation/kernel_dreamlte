@@ -2283,11 +2283,11 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 
 	__sched_fork(clone_flags, p);
 	/*
-	 * We mark the process as running here. This guarantees that
+	 * We mark the process as NEW here. This guarantees that
 	 * nobody will actually run it, and a signal or other external
 	 * event cannot wake it up and insert it on the runqueue either.
 	 */
-	p->state = TASK_RUNNING;
+	p->state = TASK_NEW;
 
 	/*
 	 * Make sure we do not leak PI boosting priority to the child.
@@ -2326,6 +2326,8 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 
 	if (p->sched_class->task_fork)
 		p->sched_class->task_fork(p);
+
+	init_entity_runnable_average(&p->se);
 
 	/*
 	 * The child is not yet in the pid-hash so no cgroup attach races,
@@ -2467,8 +2469,7 @@ void wake_up_new_task(struct task_struct *p)
 	struct rq *rq;
 
 	raw_spin_lock_irqsave(&p->pi_lock, flags);
-	/* Initialize new task's runnable average */
-	init_entity_runnable_average(&p->se);
+	p->state = TASK_RUNNING;
 	init_rt_entity_runnable_average(&p->rt);
 #ifdef CONFIG_SCHED_HMP
 	trace_sched_task_runnable_ratio(p, p->se.avg.hmp_load_avg);
@@ -8476,6 +8477,7 @@ static int cpu_cgroup_can_attach(struct cgroup_taskset *tset)
 {
 	struct task_struct *task;
 	struct cgroup_subsys_state *css;
+	int ret = 0;
 
 	cgroup_taskset_for_each(task, css, tset) {
 #ifdef CONFIG_RT_GROUP_SCHED
@@ -8486,8 +8488,24 @@ static int cpu_cgroup_can_attach(struct cgroup_taskset *tset)
 		if (task->sched_class != &fair_sched_class)
 			return -EINVAL;
 #endif
+		/*
+		 * Serialize against wake_up_new_task() such that if its
+		 * running, we're sure to observe its full state.
+		 */
+		raw_spin_lock_irq(&task->pi_lock);
+		/*
+		 * Avoid calling sched_move_task() before wake_up_new_task()
+		 * has happened. This would lead to problems with PELT, due to
+		 * move wanting to detach+attach while we're not attached yet.
+		 */
+		if (task->state == TASK_NEW)
+			ret = -EINVAL;
+		raw_spin_unlock_irq(&task->pi_lock);
+
+ 		if (ret)
+			break;
 	}
-	return 0;
+	return ret;
 }
 
 static void cpu_cgroup_attach(struct cgroup_taskset *tset)
