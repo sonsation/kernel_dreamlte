@@ -62,6 +62,8 @@ struct sugov_cpu {
 	struct update_util_data update_util;
 	struct sugov_policy *sg_policy;
 
+	unsigned int cached_raw_freq;
+
 	/* The fields below are only needed when sharing a policy. */
 	unsigned long util;
 	unsigned long max;
@@ -76,7 +78,7 @@ struct sugov_cpu {
 static DEFINE_PER_CPU(struct sugov_cpu, sugov_cpu);
 
 /************************ Governor internals ***********************/
-static unsigned int sugov_next_freq_shared(struct sugov_policy *sg_policy,
+static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu,
 					   unsigned long util, unsigned long max);
 
 static bool sugov_should_update_freq(struct sugov_policy *sg_policy, u64 time)
@@ -89,7 +91,7 @@ static bool sugov_should_update_freq(struct sugov_policy *sg_policy, u64 time)
 		if (!sg_policy->work_in_progress)
 			return true;
 		else {
-			sg_policy->next_freq = sugov_next_freq_shared(sg_policy,
+			sg_policy->next_freq = sugov_next_freq_shared(sg_cpu,
 							sg_cpu->util, sg_cpu->max);
 			sg_policy->pending = true;
 			return false;
@@ -173,7 +175,7 @@ static inline unsigned int freqvar_tipping_point(int cpu, unsigned int freq)
 
 /**
  * get_next_freq - Compute a new frequency for a given cpufreq policy.
- * @policy: cpufreq policy object to compute the new frequency for.
+ * @sg_cpu: schedutil cpu object to compute the new frequency for.
  * @util: Current CPU utilization.
  * @max: CPU capacity.
  *
@@ -188,15 +190,24 @@ static inline unsigned int freqvar_tipping_point(int cpu, unsigned int freq)
  * next_freq = C * curr_freq * util_raw / max
  *
  * Take C = 1.25 for the frequency tipping point at (util / max) = 0.8.
+ *
+ * The lowest driver-supported frequency which is equal or greater than the raw
+ * next_freq (as calculated above) is returned, subject to policy min/max and
+ * cpufreq driver limitations.
  */
-static unsigned int get_next_freq(struct cpufreq_policy *policy,
-				  unsigned long util, unsigned long max)
+static unsigned int get_next_freq(struct sugov_cpu *sg_cpu, unsigned long util, 
+				unsigned long max)
 {
+	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
+	struct cpufreq_policy *policy = sg_policy->policy;
 	unsigned int freq = arch_scale_freq_invariant() ?
 				policy->cpuinfo.max_freq : policy->cur;
 
 	freq = freqvar_tipping_point(policy->cpu, freq) * util / max;
 
+	if (freq == sg_cpu->cached_raw_freq && sg_policy->next_freq != UINT_MAX)
+		return sg_policy->next_freq;
+	sg_cpu->cached_raw_freq = freq;
 	return cpufreq_driver_resolve_freq(policy, freq);
 }
 
@@ -227,7 +238,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	busy = sugov_cpu_is_busy(sg_cpu);
 
 	next_f = util == ULONG_MAX ? policy->cpuinfo.max_freq :
-			get_next_freq(policy, util, max);
+			get_next_freq(sg_cpu, util, max);
 
 	/*
 	 * Do not reduce the frequency if the CPU has not been idle
@@ -241,9 +252,10 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	sugov_update_commit(sg_policy, time, next_f);
 }
 
-static unsigned int sugov_next_freq_shared(struct sugov_policy *sg_policy,
+static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu,
 					   unsigned long util, unsigned long max)
 {
+	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
 	struct cpufreq_policy *policy = sg_policy->policy;
 	unsigned int max_f = policy->cpuinfo.max_freq;
 	u64 last_freq_update_time = sg_policy->last_freq_update_time;
@@ -284,7 +296,7 @@ static unsigned int sugov_next_freq_shared(struct sugov_policy *sg_policy,
 	}
 
 	sg_policy->max_util = util;
-	return get_next_freq(policy, util, max);
+	return get_next_freq(sg_cpu, util, max);
 
 return_max:
 	sg_policy->max_util = max;
@@ -306,7 +318,7 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 	sg_cpu->last_update = time;
 
 	if (sugov_should_update_freq(sg_policy, time)) {
-		next_f = sugov_next_freq_shared(sg_policy, util, max);
+		next_f = sugov_next_freq_shared(sg_cpu, util, max);
 
 		trace_sched_freq_commit(time, util, max, next_f);
 
