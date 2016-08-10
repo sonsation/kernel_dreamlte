@@ -1224,8 +1224,7 @@ static void update_curr_rt(struct rq *rq)
 		return;
 
 	/* Kick cpufreq (see the comment in kernel/sched/sched.h). */
-	if (cpu_of(rq) == smp_processor_id())
-		cpufreq_update_util(rq_clock(rq), SCHED_CPUFREQ_RT);
+	cpufreq_update_this_cpu(rq, SCHED_CPUFREQ_RT);
 
 	delta_exec = rq_clock_task(rq) - curr->se.exec_start;
 	if (unlikely((s64)delta_exec <= 0))
