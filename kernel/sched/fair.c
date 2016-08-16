@@ -3088,12 +3088,8 @@ static inline u64 cfs_rq_clock_task(struct cfs_rq *cfs_rq);
 
 static inline void cfs_rq_util_change(struct cfs_rq *cfs_rq)
 {
-	struct rq *rq = rq_of(cfs_rq);
-	int cpu = cpu_of(rq);
-
-	if (cpu == smp_processor_id() && &rq->cfs == cfs_rq) {
-		unsigned long max = arch_scale_cpu_capacity(NULL, cpu);
-		unsigned long req_cap = boosted_cpu_util(cpu_util(cpu), cpu);
+	if (&this_rq()->cfs == cfs_rq) {
+		struct rq *rq = rq_of(cfs_rq);
 
 		/*
 		 * There are a few boundary cases this might miss but it should
@@ -3112,10 +3108,7 @@ static inline void cfs_rq_util_change(struct cfs_rq *cfs_rq)
 		 * See cpu_util().
 		 */
 
-		trace_sched_rq_util_avg(cpu_of(rq_of(cfs_rq)), cfs_rq->avg.util_avg,
-					req_cap);
-
-		cpufreq_update_util(rq_clock(rq), min(req_cap, max), max);
+		cpufreq_update_util(rq_clock(rq), 0);
 	}
 }
 
