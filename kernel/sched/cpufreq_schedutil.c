@@ -43,6 +43,7 @@ struct sugov_policy {
 	s64 up_rate_delay_ns;
 	s64 down_rate_delay_ns;
 	unsigned int next_freq;
+	unsigned int cached_raw_freq;
 	bool pending;
 
 	/* The next fields are only needed if fast switch cannot be used. */
@@ -60,7 +61,6 @@ struct sugov_cpu {
 	struct update_util_data update_util;
 	struct sugov_policy *sg_policy;
 
-	unsigned int cached_raw_freq;
 	unsigned long iowait_boost;
 	unsigned long iowait_boost_max;
 	u64 last_update;
@@ -193,9 +193,9 @@ static unsigned int get_next_freq(struct sugov_cpu *sg_cpu, unsigned long util,
 
 	freq = freqvar_tipping_point(policy->cpu, freq) * util / max;
 
-	if (freq == sg_cpu->cached_raw_freq && sg_policy->next_freq != UINT_MAX)
+	if (freq == sg_policy->cached_raw_freq && sg_policy->next_freq != UINT_MAX)
 		return sg_policy->next_freq;
-	sg_cpu->cached_raw_freq = freq;
+	sg_policy->cached_raw_freq = freq;
 	return cpufreq_driver_resolve_freq(policy, freq);
 }
 
@@ -744,6 +744,7 @@ static int sugov_start(struct cpufreq_policy *policy)
 	sg_policy->pending = false;
 	sg_policy->work_in_progress = false;
 	sg_policy->need_freq_update = false;
+	sg_policy->cached_raw_freq = 0;
 
 	for_each_cpu(cpu, policy->cpus) {
 		struct sugov_cpu *sg_cpu = &per_cpu(sugov_cpu, cpu);
