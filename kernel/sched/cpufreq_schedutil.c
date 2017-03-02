@@ -162,7 +162,7 @@ static inline unsigned int freqvar_tipping_point(int cpu, unsigned int freq)
 
 /**
  * get_next_freq - Compute a new frequency for a given cpufreq policy.
- * @sg_cpu: schedutil cpu object to compute the new frequency for.
+ * @sg_policy: schedutil policy object to compute the new frequency for.
  * @util: Current CPU utilization.
  * @max: CPU capacity.
  *
@@ -182,10 +182,9 @@ static inline unsigned int freqvar_tipping_point(int cpu, unsigned int freq)
  * next_freq (as calculated above) is returned, subject to policy min/max and
  * cpufreq driver limitations.
  */
-static unsigned int get_next_freq(struct sugov_cpu *sg_cpu, unsigned long util, 
-				unsigned long max)
+static unsigned int get_next_freq(struct sugov_policy *sg_policy,
+				  unsigned long util, unsigned long max)
 {
-	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
 	struct cpufreq_policy *policy = sg_policy->policy;
 	unsigned int freq = arch_scale_freq_invariant() ?
 				policy->cpuinfo.max_freq : policy->cur;
@@ -282,7 +281,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	} else {
 		sugov_get_util(&util, &max, time);
 		sugov_iowait_boost(sg_cpu, &util, &max);
-		next_f = get_next_freq(sg_cpu, util, max);
+		next_f = get_next_freq(sg_policy, util, max);
 	}
 
 	/*
@@ -347,7 +346,7 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu,
 		sugov_iowait_boost(j_sg_cpu, &util, &max);
 	}
 
-	return get_next_freq(sg_cpu, util, max);
+	return get_next_freq(sg_policy, util, max);
 }
 
 static void sugov_update_shared(struct update_util_data *hook, u64 time,
