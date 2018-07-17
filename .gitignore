@@ -122,3 +122,14 @@ ramdisk
 preZip
 export
 1.sh
+./scripts/rkp_cfp/common.pyc
+./arch/arm64/kernel/vdso/vdso.so
+./tools/prebuilts/gcc-cfp-jopp-only/aarch64-linux-android-4.9/aarch64-linux-android/lib64/libatomic.a
+./tools/prebuilts/gcc-cfp-jopp-only/aarch64-linux-android-4.9/aarch64-linux-android/lib64/libgomp.a
+./tools/prebuilts/gcc-cfp-jopp-only/aarch64-linux-android-4.9/lib/gcc/aarch64-linux-android/4.9/crtbegin.o
+./tools/prebuilts/gcc-cfp-jopp-only/aarch64-linux-android-4.9/lib/gcc/aarch64-linux-android/4.9/crtbeginS.o
+./tools/prebuilts/gcc-cfp-jopp-only/aarch64-linux-android-4.9/lib/gcc/aarch64-linux-android/4.9/crtbeginT.o
+./tools/prebuilts/gcc-cfp-jopp-only/aarch64-linux-android-4.9/lib/gcc/aarch64-linux-android/4.9/crtend.o
+./tools/prebuilts/gcc-cfp-jopp-only/aarch64-linux-android-4.9/lib/gcc/aarch64-linux-android/4.9/crtendS.o
+./tools/prebuilts/gcc-cfp-jopp-only/aarch64-linux-android-4.9/lib/gcc/aarch64-linux-android/4.9/libgcc.a
+./tools/prebuilts/gcc-cfp-jopp-only/aarch64-linux-android-4.9/lib/gcc/aarch64-linux-android/4.9/libgcov.a
