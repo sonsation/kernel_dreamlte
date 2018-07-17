@@ -989,7 +989,8 @@ void tcp_rcv_space_adjust(struct sock *sk)
 		if (cltcp(tp)) {
 			cltcp_rwnd_max_adjustment(tp);
 			
-			rcvbuf = min(rcvwin / tp->advmss * rcvmem, cltcp_rmem_max(tp));
+			do_div(rcvwin, tp->advmss);
+			rcvbuf = min_t(u64, rcvwin * rcvmem, cltcp_rmem_max(tp));
 		} else 
 #endif
 		do_div(rcvwin, tp->advmss);
