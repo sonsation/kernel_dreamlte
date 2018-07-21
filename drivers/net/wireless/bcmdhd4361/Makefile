@@ -301,6 +301,9 @@ ifeq ($(CONFIG_WLAN_VHTDISABLE),y)
 DHDCFLAGS += -DDHD_DISABLE_VHTMODE
 endif
 
+# Platform version
+PLATFORM_VERSION=8.0
+
 # Android Version Check from Platform source
 ifneq ($(PLATFORM_VERSION),)
 MAJOR_VERSION := $(shell echo $(PLATFORM_VERSION) | cut -d "." -f 1)
