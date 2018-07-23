@@ -773,13 +773,6 @@ out:
 	kfree(n);
 	kfree(t);
 
-// [ SEC_SELINUX_PORTING_COMMON
-#ifdef CONFIG_ALWAYS_ENFORCE
-#if !defined(CONFIG_RKP_KDP)
-	selinux_enforcing = 1;
-#endif
-#endif
-// ] SEC_SELINUX_PORTING_COMMON
 	if (!selinux_enforcing)
 		return 0;
 	return -EPERM;
@@ -1544,15 +1537,6 @@ out:
 	kfree(t);
 	kfree(n);
 
-// [ SEC_SELINUX_PORTING_COMMON
-#ifdef CONFIG_ALWAYS_ENFORCE
-#if !defined(CONFIG_RKP_KDP)
-	selinux_enforcing = 1;
-#endif
-#endif
-// ] SEC_SELINUX_PORTING_COMMON
-	if (!selinux_enforcing)
-		return 0;
 	return -EACCES;
 }
 
@@ -1842,13 +1826,6 @@ static inline int convert_context_handle_invalid_context(struct context *context
 	char *s;
 	u32 len;
 
-// [ SEC_SELINUX_PORTING_COMMON
-#ifdef CONFIG_ALWAYS_ENFORCE
-#if !defined(CONFIG_RKP_KDP)
-	selinux_enforcing = 1;
-#endif
-#endif
-// ] SEC_SELINUX_PORTING_COMMON
 	if (selinux_enforcing)
 		return -EINVAL;
 
@@ -2574,9 +2551,6 @@ int security_fs_use(struct super_block *sb)
 {
 	int rc = 0;
 	struct ocontext *c;
-// [ SEC_SELINUX_PORTING_COMMON
-	u32 tmpsid;
-// ] SEC_SELINUX_PORTING_COMMON
 
 	struct superblock_security_struct *sbsec = sb->s_security;
 	const char *fstype = sb->s_type->name;
@@ -2593,21 +2567,11 @@ int security_fs_use(struct super_block *sb)
 	if (c) {
 		sbsec->behavior = c->v.behavior;
 		if (!c->sid[0]) {
-// [ SEC_SELINUX_PORTING_COMMON
-			rc = sidtab_context_to_sid(&sidtab, &c->context[0],
-						   &tmpsid);
-			c->sid[0] = tmpsid;
-// ] SEC_SELINUX_PORTING_COMMON
 			if (rc)
 				goto out;
 		}
 		sbsec->sid = c->sid[0];
 	} else {
-// [ SEC_SELINUX_PORTING_COMMON
-		rc = __security_genfs_sid(fstype, "/", SECCLASS_DIR,
-					  &tmpsid);
-		sbsec->sid = tmpsid;
-// ] SEC_SELINUX_PORTING_COMMON
 		if (rc) {
 			sbsec->behavior = SECURITY_FS_USE_NONE;
 			rc = 0;
