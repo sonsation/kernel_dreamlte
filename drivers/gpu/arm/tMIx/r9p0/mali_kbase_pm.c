@@ -108,7 +108,7 @@ int kbase_pm_context_active_handle_suspend(struct kbase_device *kbdev, enum kbas
 		kbase_timeline_pm_handle_event(kbdev, KBASE_TIMELINE_PM_EVENT_GPU_ACTIVE);
 
 	/* MALI_SEC_INTEGRATION */
-	if (c == 1) {
+	if (c == 1 || ((kbdev->hwcnt.kctx) && c == 2)) {
 		/* First context active: Power on the GPU and any cores requested by
 		 * the policy */
 		kbase_hwaccess_pm_gpu_active(kbdev);
