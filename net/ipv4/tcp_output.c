@@ -1169,7 +1169,7 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 	return net_xmit_eval(err);
 }
 
-static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb, int clone_it,
+int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb, int clone_it,
 			    gfp_t gfp_mask)
 {
 	return __tcp_transmit_skb(sk, skb, clone_it, gfp_mask,
