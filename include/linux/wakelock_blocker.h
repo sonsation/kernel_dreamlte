@@ -25,6 +25,7 @@
 struct wake_item {
 	char wake_name[MAX_NAME_LEN];
 	size_t wake_count;
+	int len;
 	struct list_head list;
 };
 

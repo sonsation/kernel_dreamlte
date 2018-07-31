@@ -38,7 +38,7 @@ bool check_wakelock(struct wakeup_source *ws) {
 
 	list_for_each_entry_safe(wakelock,n,&wakelock_list, list) {
 
-		if(memcmp(wakelock->wake_name, ws->name, strlen(ws->name)) == 0) {	
+		if(memcmp(wakelock->wake_name, ws->name, wakelock->len) == 0) {	
 			wakelock->wake_count++;
 			return true;
 		}
@@ -66,7 +66,8 @@ static void item_to_list(void) {
 			for(addr = start ; addr < index+1 ; addr++) {
 				len += sprintf(wake->wake_name + len, "%c", *addr);
 			}
-
+			
+			wake->len = strlen(wake->wake_name);
 			list_add(&wake->list, &wakelock_list);
 			start = index +2;	
 		}
