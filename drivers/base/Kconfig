@@ -327,4 +327,8 @@ config CMA_ALIGNMENT
 
 endif
 
+config WAKELOCK_BLOCKER
+	tristate "Kernel Wakelock Block driver"
+	default y
+
 endmenu
