@@ -15,12 +15,15 @@
  *
  */
 
+#ifndef __LINUX_WAKELOCK_BLOCKER_H
+#define __LINUX_WAKELOCK_BLOCKER_H
+
 #include <linux/list.h>
 
 #define MAJOR_VERSION "1.0"
 #define MAX_NAME_LEN  255
 #define DEFAULT_ENABLED true
-#define DEFAULT_LIST "wlan_rx_wake wlan_wake"
+#define DEFAULT_LIST "wlan_rx_wake wlan_ctrl_wake wlan_wake NETLINK wlan_txfl_wake bluetooth_timer BT_host_wake BT_bt_wake mmc0_detect"
 
 struct wake_item {
 	char wake_name[MAX_NAME_LEN];
@@ -30,3 +33,5 @@ struct wake_item {
 };
 
 bool check_wakelock(struct wakeup_source *ws);
+
+#endif

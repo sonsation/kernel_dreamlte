@@ -48,7 +48,7 @@ bool check_wakelock(struct wakeup_source *ws) {
 
 }
 
-static void item_to_list(void) {
+static int item_to_list(void) {
 
 	char *index, *start, *addr;
     
@@ -64,6 +64,11 @@ static void item_to_list(void) {
 			unsigned int len = 0;
 
 			for(addr = start ; addr < index+1 ; addr++) {
+
+				if(len > MAX_NAME_LEN - 1) {
+					return -EINVAL;
+				}
+
 				len += sprintf(wake->wake_name + len, "%c", *addr);
 			}
 			
@@ -73,6 +78,8 @@ static void item_to_list(void) {
 		}
 		index++;
 	}
+
+	return false;
 }
 
 static ssize_t debug_show(struct class *class, struct class_attribute *attr, char *buf) {
@@ -123,6 +130,7 @@ static ssize_t list_show(struct class *class, struct class_attribute *attr, char
  
 static ssize_t list_store(struct class *class, struct class_attribute *attr, const char *buf, size_t len) {
 
+	int ret = 0;
 	struct wake_item *wakelock, *n;
 
 	if (len > MAX_NAME_LEN)
@@ -136,7 +144,11 @@ static ssize_t list_store(struct class *class, struct class_attribute *attr, con
 		kfree(wakelock);
 	}
 
-	item_to_list();
+	ret = item_to_list();
+
+	if (ret) {
+		pr_err("Failed to create list \n");
+	}
     
 	return len;
 }
@@ -159,7 +171,12 @@ static int __init blocker_sysfs_init(void) {
         int ret = 0;
 
 	memcpy(wakelock_item_list, DEFAULT_LIST, sizeof(DEFAULT_LIST));
-	item_to_list();
+
+	ret = item_to_list();
+
+	if (ret) {
+		pr_err("Failed to create list \n");
+	}
  
 	ret = class_register(&wakelock_blocker_sysfs_class);
 	if (ret) {
@@ -173,6 +190,14 @@ sysfs_err:
 }
 
 static void __exit blocker_sysfs_exit(void) {
+
+	struct wake_item *wakelock, *n;
+
+	list_for_each_entry_safe(wakelock,n,&wakelock_list, list) {
+		list_del(&wakelock->list);
+		kfree(wakelock);
+	}
+
 	class_unregister(&wakelock_blocker_sysfs_class);
 }
 
