@@ -458,10 +458,6 @@ static int sugov_kthread_create(struct sugov_policy *sg_policy)
 	struct cpufreq_policy *policy = sg_policy->policy;
 	int ret;
 
-	/* kthread only required for slow path */
-	if (policy->fast_switch_enabled)
-		return 0;
-
 	init_kthread_work(&sg_policy->work, sugov_work);
 	init_kthread_worker(&sg_policy->worker);
 	thread = kthread_create(kthread_worker_fn, &sg_policy->worker,
@@ -488,10 +484,6 @@ static int sugov_kthread_create(struct sugov_policy *sg_policy)
 
 static void sugov_kthread_stop(struct sugov_policy *sg_policy)
 {
-	/* kthread only required for slow path */
-	if (sg_policy->policy->fast_switch_enabled)
-		return;
-
 	flush_kthread_worker(&sg_policy->worker);
 	kthread_stop(sg_policy->thread);
 }
