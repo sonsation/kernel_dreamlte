@@ -182,7 +182,9 @@ static unsigned int get_next_freq(struct cpufreq_policy *policy,
 	unsigned int freq = arch_scale_freq_invariant() ?
 				policy->cpuinfo.max_freq : policy->cur;
 
-	return (freq + (freq >> 2)) * util / max;
+	freq = (freq + (freq >> 2)) * util / max;
+
+	return cpufreq_driver_resolve_freq(policy, freq);
 }
 
 static void sugov_update_single(struct update_util_data *hook, u64 time,
