@@ -39,7 +39,13 @@ bool check_wakelock(struct wakeup_source *ws) {
 	list_for_each_entry_safe(wakelock,n,&wakelock_list, list) {
 
 		if(memcmp(wakelock->wake_name, ws->name, wakelock->len) == 0) {	
+
+			if(wakelock->wake_count == SIZE_MAX) {
+				wakelock->wake_count = 0;	
+			}
+
 			wakelock->wake_count++;
+
 			return true;
 		}
 	}
