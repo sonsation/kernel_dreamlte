@@ -602,6 +602,19 @@ static struct notifier_block freqvar_cpufreq_notifier = {
 	.notifier_call  = freqvar_cpufreq_callback,
 };
 
+int freqvar_tune_exit(void)
+{
+	int ret = 0;
+
+	ret = cpufreq_unregister_notifier(&freqvar_cpufreq_notifier,
+					 CPUFREQ_TRANSITION_NOTIFIER);
+
+	if (ret)
+		pr_err("cannot exit freqvar \n");
+
+	return ret; 
+}
+
 /**********************************************************************
  * initialization                                                     *
  **********************************************************************/

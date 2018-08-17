@@ -88,3 +88,7 @@ int schedtune_accept_deltas(int nrg_delta, int cap_delta,
 #define schedtune_accept_deltas(nrg_delta, cap_delta, task) nrg_delta
 
 #endif /* CONFIG_SCHED_TUNE */
+
+#ifdef CONFIG_FREQVAR_SCHEDTUNE
+int freqvar_tune_exit(void);
+#endif 

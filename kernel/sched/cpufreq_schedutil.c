@@ -637,7 +637,9 @@ static int sugov_exit(struct cpufreq_policy *policy)
 	policy->governor_data = NULL;
 	if (!count)
 		sugov_tunables_free(tunables);
-
+#ifdef CONFIG_FREQVAR_SCHEDTUNE
+	freqvar_tune_exit();
+#endif 
 	mutex_unlock(&global_tunables_lock);
 
 	sugov_policy_free(sg_policy);
