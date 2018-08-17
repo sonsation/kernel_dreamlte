@@ -2839,6 +2839,11 @@ boosted_task_util(struct task_struct *task)
 	return util + margin;
 }
 
+#ifdef CONFIG_FREQVAR_SCHEDTUNE
+extern unsigned long freqvar_boost_vector(int cpu, unsigned long util,
+						struct cfs_rq *cfs_rq);
+#endif
+
 /*
  * We can represent the historical contribution to runnable average as the
  * coefficients of a geometric series.  To do this we sub-divide our runnable
@@ -2881,22 +2886,6 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 	u32 contrib;
 	unsigned int delta_w, scaled_delta_w, decayed = 0;
 	unsigned long scale_freq, scale_cpu;
-#ifdef CONFIG_FREQVAR_SCHEDTUNE
-	unsigned int boost_vector = 1024;
-	unsigned int cap;
-
-	/*
-	 * boost task load(util_sum/avg) and load of cfs_rq is not included.
-	 * boost ratio is changed with frequency scale.
-	 * 1024 is default boost_vector. it is no effect.
-	 * if boost_vector is 2048, it means adding twice bigger load than orinal load
-	 */
-	if (cfs_rq && cfs_rq->nr_running)
-		cap = 1024 - (sa->util_avg / cfs_rq->nr_running);
-	else
-		cap = 1024 - sa->util_avg;
-	boost_vector += (cap * schedtune_freqvar_boost(cpu)) >> SCHED_CAPACITY_SHIFT;
-#endif
 
 	delta = now - sa->last_update_time;
 #ifdef CONFIG_HMP_VARIABLE_SCALE
@@ -2926,7 +2915,11 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 	sa->last_update_time = now;
 
 	scale_freq = arch_scale_freq_capacity(NULL, cpu);
+#ifdef CONFIG_FREQVAR_SCHEDTUNE
+	scale_cpu = freqvar_boost_vector(cpu, sa->util_avg, cfs_rq);
+#else
 	scale_cpu = arch_scale_cpu_capacity(NULL, cpu);
+#endif
 
 	/* delta_w is the amount already accumulated against our next period */
 	delta_w = sa->period_contrib;
@@ -2953,18 +2946,8 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 						weight * scaled_delta_w;
 			}
 		}
-		if (running) {
-#ifndef CONFIG_FREQVAR_SCHEDTUNE
+		if (running)
 			sa->util_sum += scaled_delta_w * scale_cpu;
-#else
-			/* applying utilization boost */
-			sa->util_sum += (scaled_delta_w * scale_cpu * boost_vector)
-								>> SCHED_CAPACITY_SHIFT;
-			trace_schedtune_boost_util(cfs_rq ? "RQ" : "TASK", scaled_delta_w * scale_cpu,
-				(scaled_delta_w * scale_cpu * boost_vector) >> SCHED_CAPACITY_SHIFT,
-				boost_vector);
-#endif
-		}
 
 		delta -= delta_w;
 
@@ -2993,18 +2976,8 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 			if (cfs_rq)
 				cfs_rq->runnable_load_sum += weight * contrib;
 		}
-		if (running) {
-#ifndef CONFIG_FREQVAR_SCHEDTUNE
+		if (running)
 			sa->util_sum += contrib * scale_cpu;
-#else
-			/* applying utilization boost */
-			sa->util_sum += (contrib * scale_cpu * boost_vector)
-							>> SCHED_CAPACITY_SHIFT;
-			trace_schedtune_boost_util(cfs_rq ? "RQ" : "TASK", contrib * scale_cpu,
-				(contrib * scale_cpu * boost_vector) >> SCHED_CAPACITY_SHIFT,
-				boost_vector);
-#endif
-		}
 	}
 
 	/* Remainder of delta accrued against u_0` */

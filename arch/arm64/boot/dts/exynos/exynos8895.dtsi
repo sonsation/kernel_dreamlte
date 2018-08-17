@@ -450,16 +450,22 @@
 
 	schedtune {
 		domain@0 {
-			device_type = "schedtune-freqvar";
+			device_type = "freqvar-tune";
 			shared-cpus = "0-3";
-			/* this table works like target_load of interactive parameter */
-			table = < 100 598000 60 715000 30 832000 20 949000 10 1053000 0 >;
+
+			boost_table = < 100 598000 60 715000 30 832000 20 949000 10 1053000 0 >;
+			up_rate_limit_table = < 5 >;
+			down_rate_limit_table = < 5 >;
+			upscale_ratio_table = < 80 >;
 		};
 		domain@1 {
-			device_type = "schedtune-freqvar";
+			device_type = "freqvar-tune";
 			shared-cpus = "4-7";
-			/* this table works like target_load of interactive parameter */
-			table = < 20 858000 15 962000 5 1261000 0 >;
+
+			boost_table = < 20 858000 15 962000 5 1261000 0 >;
+			up_rate_limit_table = < 5 >;
+			down_rate_limit_table = < 5 >;
+			upscale_ratio_table = < 80 >;
 		};
 	};
 

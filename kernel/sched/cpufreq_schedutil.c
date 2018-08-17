@@ -28,9 +28,6 @@ struct sugov_tunables {
 	struct gov_attr_set attr_set;
 	unsigned int up_rate_limit_us;
 	unsigned int down_rate_limit_us;
-#ifdef CONFIG_FREQVAR_SCHEDTUNE
-	struct freqvar_boost_data freqvar_boost;
-#endif
 };
 
 struct sugov_policy {
@@ -158,6 +155,15 @@ static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
 	}
 }
 
+#ifdef CONFIG_FREQVAR_SCHEDTUNE
+unsigned int freqvar_tipping_point(int cpu, unsigned int freq);
+#else
+static inline unsigned int freqvar_tipping_point(int cpu, unsigned int freq)
+{
+	return  freq + (freq >> 2);
+}
+#endif
+
 /**
  * get_next_freq - Compute a new frequency for a given cpufreq policy.
  * @policy: cpufreq policy object to compute the new frequency for.
@@ -182,7 +188,7 @@ static unsigned int get_next_freq(struct cpufreq_policy *policy,
 	unsigned int freq = arch_scale_freq_invariant() ?
 				policy->cpuinfo.max_freq : policy->cur;
 
-	freq = (freq + (freq >> 2)) * util / max;
+	freq = freqvar_tipping_point(policy->cpu, freq) * util / max;
 
 	return cpufreq_driver_resolve_freq(policy, freq);
 }
@@ -323,6 +329,54 @@ static void sugov_irq_work(struct irq_work *irq_work)
 	queue_kthread_work(&sg_policy->worker, &sg_policy->work);
 }
 
+/************************ Governor externals ***********************/
+static void update_min_rate_limit_us(struct sugov_policy *sg_policy);
+void sugov_update_rate_limit_us(struct cpufreq_policy *policy,
+			int up_rate_limit_ms, int down_rate_limit_ms)
+{
+	struct sugov_policy *sg_policy;
+	struct sugov_tunables *tunables;
+
+	sg_policy = policy->governor_data;
+	if (!sg_policy)
+		return;
+
+	tunables = sg_policy->tunables;
+	if (!tunables)
+		return;
+
+	tunables->up_rate_limit_us = (unsigned int)(up_rate_limit_ms * USEC_PER_MSEC);
+	tunables->down_rate_limit_us = (unsigned int)(down_rate_limit_ms * USEC_PER_MSEC);
+
+	sg_policy->up_rate_delay_ns = up_rate_limit_ms * NSEC_PER_MSEC;
+	sg_policy->down_rate_delay_ns = down_rate_limit_ms * NSEC_PER_MSEC;
+
+	update_min_rate_limit_us(sg_policy);
+}
+
+int sugov_sysfs_add_attr(struct cpufreq_policy *policy, const struct attribute *attr)
+{
+	struct sugov_policy *sg_policy;
+	struct sugov_tunables *tunables;
+
+	sg_policy = policy->governor_data;
+	if (!sg_policy)
+		return -ENODEV;
+
+	tunables = sg_policy->tunables;
+	if (!tunables)
+		return -ENODEV;
+
+	return sysfs_create_file(&tunables->attr_set.kobj, attr);
+}
+
+struct cpufreq_policy *sugov_get_attr_policy(struct gov_attr_set *attr_set)
+{
+	struct sugov_policy *sg_policy = list_first_entry(&attr_set->policy_list,
+						typeof(*sg_policy), tunables_hook);
+	return sg_policy->policy;
+}
+
 /************************** sysfs interface ************************/
 
 static struct sugov_tunables *global_tunables;
@@ -375,85 +429,6 @@ static ssize_t up_rate_limit_us_store(struct gov_attr_set *attr_set,
 
 	return count;
 }
-#ifdef CONFIG_FREQVAR_SCHEDTUNE
-static unsigned int *get_tokenized_data(const char *buf, int *num_tokens)
-{
-	const char *cp;
-	int i;
-	int ntokens = 1;
-	unsigned int *tokenized_data;
-	int err = -EINVAL;
-
-	cp = buf;
-	while ((cp = strpbrk(cp + 1, " :")))
-		ntokens++;
-
-	if (!(ntokens & 0x1))
-		goto err;
-
-	tokenized_data = kmalloc(ntokens * sizeof(unsigned int), GFP_KERNEL);
-	if (!tokenized_data) {
-		err = -ENOMEM;
-		goto err;
-	}
-
-	cp = buf;
-	i = 0;
-	while (i < ntokens) {
-		if (sscanf(cp, "%u", &tokenized_data[i++]) != 1)
-			goto err_kfree;
-
-		cp = strpbrk(cp, " :");
-		if (!cp)
-			break;
-		cp++;
-	}
-
-	if (i != ntokens)
-		goto err_kfree;
-
-	*num_tokens = ntokens;
-	return tokenized_data;
-
-err_kfree:
-	kfree(tokenized_data);
-err:
-	return ERR_PTR(err);
-}
-
-static ssize_t freqvar_boost_show(struct gov_attr_set *attr_set, char *buf)
-{
-	struct sugov_tunables *tunables = to_sugov_tunables(attr_set);
-	struct freqvar_boost_data *data = &tunables->freqvar_boost;
-	struct freqvar_boost_table *pos = data->table;
-	int ret = 0;
-
-	for (; pos->frequency != CPUFREQ_TABLE_END; pos++)
-		ret += sprintf(buf + ret, "%8d ratio:%3d \n", pos->frequency,
-					pos->boost / SCHEDTUNE_LOAD_BOOST_UTIT);
-	return ret;
-}
-
-static ssize_t freqvar_boost_store(struct gov_attr_set *attr_set, const char *buf,
-				   size_t count)
-{
-	struct sugov_tunables *tunables = to_sugov_tunables(attr_set);
-	struct freqvar_boost_data *data = &tunables->freqvar_boost;
-	int *new_table = NULL;
-	int ntokens;
-
-	new_table = get_tokenized_data(buf, &ntokens);
-	if (IS_ERR(new_table))
-		return PTR_RET(new_table);
-
-	schedtune_freqvar_update_table(new_table, ntokens, data->table);
-
-	kfree(new_table);
-
-	return count;
-}
-static struct governor_attr freqvar_boost = __ATTR_RW(freqvar_boost);
-#endif /* CONFIG_FREQVAR_SCHEDTUNE */
 
 static ssize_t down_rate_limit_us_store(struct gov_attr_set *attr_set,
 					const char *buf, size_t count)
@@ -461,9 +436,12 @@ static ssize_t down_rate_limit_us_store(struct gov_attr_set *attr_set,
 	struct sugov_tunables *tunables = to_sugov_tunables(attr_set);
 	struct sugov_policy *sg_policy;
 	unsigned int rate_limit_us;
+
  	if (kstrtouint(buf, 10, &rate_limit_us))
 		return -EINVAL;
+
  	tunables->down_rate_limit_us = rate_limit_us;
+
  	list_for_each_entry(sg_policy, &attr_set->policy_list, tunables_hook) {
 		sg_policy->down_rate_delay_ns = rate_limit_us * NSEC_PER_USEC;
 		update_min_rate_limit_us(sg_policy);
@@ -477,9 +455,6 @@ static struct governor_attr down_rate_limit_us = __ATTR_RW(down_rate_limit_us);
 static struct attribute *sugov_attributes[] = {
 	&up_rate_limit_us.attr,
 	&down_rate_limit_us.attr,
-#ifdef CONFIG_FREQVAR_SCHEDTUNE
-	&freqvar_boost.attr,
-#endif
 	NULL
 };
 
@@ -618,9 +593,6 @@ static int sugov_init(struct cpufreq_policy *policy)
 		tunables->down_rate_limit_us *= lat;
 	}
 
-	/* init freqvar_boost */
-	schedtune_freqvar_boost_init(policy, &tunables->freqvar_boost);
-
 	policy->governor_data = sg_policy;
 	sg_policy->tunables = tunables;
 
@@ -637,7 +609,6 @@ static int sugov_init(struct cpufreq_policy *policy)
 
  fail:
 	policy->governor_data = NULL;
-	schedtune_freqvar_boost_exit(policy, &tunables->freqvar_boost);
 	sugov_tunables_free(tunables);
 
  stop_kthread:
@@ -662,10 +633,8 @@ static int sugov_exit(struct cpufreq_policy *policy)
 
 	count = gov_attr_set_put(&tunables->attr_set, &sg_policy->tunables_hook);
 	policy->governor_data = NULL;
-	if (!count) {
-		schedtune_freqvar_boost_exit(policy, &tunables->freqvar_boost);
+	if (!count)
 		sugov_tunables_free(tunables);
-	}
 
 	mutex_unlock(&global_tunables_lock);
 
