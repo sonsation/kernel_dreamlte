@@ -1938,7 +1938,6 @@ static inline void account_reset_rq(struct rq *rq)
 }
 
 #ifdef CONFIG_SMP
-#ifdef CONFIG_SCHED_USE_FLUID_RT
 static unsigned long capacity_orig_of(int cpu)
 {
 	return cpu_rq(cpu)->cpu_capacity_orig;
@@ -1977,5 +1976,4 @@ static inline unsigned long cpu_util(int cpu)
 	util = cpu_rq(cpu)->cfs.avg.util_avg + cpu_rq(cpu)->rt.avg.util_avg;
 	return (util >= capacity) ? capacity : util;
 }
-#endif
 #endif
