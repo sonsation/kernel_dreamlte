@@ -860,9 +860,6 @@ static void update_curr_dl(struct rq *rq)
 	if (!dl_task(curr) || !on_dl_rq(dl_se))
 		return;
 
-	/* kick cpufreq (see the comment in kernel/sched/sched.h). */
-	cpufreq_update_this_cpu(rq, SCHED_CPUFREQ_DL);
-
 	/*
 	 * Consumed budget is computed considering the time as
 	 * observed by schedulable tasks (excluding time spent
@@ -875,10 +872,8 @@ static void update_curr_dl(struct rq *rq)
 	if (unlikely((s64)delta_exec <= 0))
 		return;
 
-#ifdef CPU_FREQ_DEFAULT_GOV_SCHEDUTIL
 	/* kick cpufreq (see the comment in kernel/sched/sched.h). */
 	cpufreq_update_this_cpu(rq, SCHED_CPUFREQ_DL);
-#endif
 
 	schedstat_set(curr->se.statistics.exec_max,
 		      max(curr->se.statistics.exec_max, delta_exec));
