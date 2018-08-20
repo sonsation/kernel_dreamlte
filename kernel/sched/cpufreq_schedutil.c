@@ -43,7 +43,6 @@ struct sugov_policy {
 	s64 up_rate_delay_ns;
 	s64 down_rate_delay_ns;
 	unsigned int next_freq;
-	unsigned int max_util;
 	bool pending;
 
 	/* The next fields are only needed if fast switch cannot be used. */
@@ -84,19 +83,6 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu,
 static bool sugov_should_update_freq(struct sugov_policy *sg_policy, u64 time)
 {
 	s64 delta_ns;
-	struct sugov_cpu *sg_cpu = &per_cpu(sugov_cpu, smp_processor_id());
-	bool up_scale = (sg_cpu->util > sg_policy->max_util);
-
-	if (up_scale) {
-		if (!sg_policy->work_in_progress)
-			return true;
-		else {
-			sg_policy->next_freq = sugov_next_freq_shared(sg_cpu,
-							sg_cpu->util, sg_cpu->max);
-			sg_policy->pending = true;
-			return false;
-		}
-	}
 
 	if (sg_policy->work_in_progress)
 		return false;
@@ -277,7 +263,7 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu,
 	unsigned int j;
 
 	if (flags & SCHED_CPUFREQ_RT_DL)
-		goto return_max;
+		return max_f;
 
 	for_each_cpu(j, policy->cpus) {
 		struct sugov_cpu *j_sg_cpu;
@@ -300,7 +286,7 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu,
 			continue;
 
 		if (j_sg_cpu->flags & SCHED_CPUFREQ_RT_DL)
-			goto return_max;
+			return max_f;
 
 		j_util = j_sg_cpu->util;
 		j_max = j_sg_cpu->max;
@@ -310,13 +296,7 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu,
 		}
 	}
 
-	sg_policy->max_util = util;
 	return get_next_freq(sg_cpu, util, max);
-
-return_max:
-	sg_policy->max_util = max;
-	return max_f;
-
 }
 
 static void sugov_update_shared(struct update_util_data *hook, u64 time,
@@ -716,7 +696,6 @@ static int sugov_start(struct cpufreq_policy *policy)
 	update_min_rate_limit_us(sg_policy);
 	sg_policy->last_freq_update_time = 0;
 	sg_policy->next_freq = UINT_MAX;
-	sg_policy->max_util = 0;
 	sg_policy->pending = false;
 	sg_policy->work_in_progress = false;
 	sg_policy->need_freq_update = false;
