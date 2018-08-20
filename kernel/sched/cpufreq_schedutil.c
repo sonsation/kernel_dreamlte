@@ -226,7 +226,7 @@ static void sugov_get_util(unsigned long *util, unsigned long *max, u64 time)
 	rt = div64_u64(rq->rt_avg, sched_avg_period() + delta);
 	rt = (rt * max_cap) >> SCHED_CAPACITY_SHIFT;
 
- 	*util = min(rq->cfs.avg.util_avg + rt, max_cap);
+ 	*util = min(boosted_cpu_util(cpu) + rt, max_cap);
 	*max = max_cap;
 }
 

@@ -1968,4 +1968,7 @@ static inline unsigned long cpu_util(int cpu)
 	util = cpu_rq(cpu)->cfs.avg.util_avg + cpu_rq(cpu)->rt.avg.util_avg;
 	return (util >= capacity) ? capacity : util;
 }
+
+unsigned long
+boosted_cpu_util(int cpu);
 #endif
