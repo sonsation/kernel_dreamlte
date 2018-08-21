@@ -44,7 +44,6 @@ struct sugov_policy {
 	s64 down_rate_delay_ns;
 	unsigned int next_freq;
 	unsigned int cached_raw_freq;
-	bool pending;
 
 	/* The next fields are only needed if fast switch cannot be used. */
 	struct irq_work irq_work;
@@ -403,12 +402,6 @@ static void sugov_work(struct kthread_work *work)
 
 	__cpufreq_driver_target(sg_policy->policy, sg_policy->next_freq,
 			CPUFREQ_RELATION_L);
-	/* if frequency up scaling is in pending, retry scaling */
-	if (sg_policy->pending) {
-		__cpufreq_driver_target(sg_policy->policy, sg_policy->next_freq,
-				CPUFREQ_RELATION_L);
-		sg_policy->pending = false;
-	}
 
 	mutex_unlock(&sg_policy->work_lock);
 
@@ -770,7 +763,6 @@ static int sugov_start(struct cpufreq_policy *policy)
 	update_min_rate_limit_us(sg_policy);
 	sg_policy->last_freq_update_time = 0;
 	sg_policy->next_freq = UINT_MAX;
-	sg_policy->pending = false;
 	sg_policy->work_in_progress = false;
 	sg_policy->need_freq_update = false;
 	sg_policy->cached_raw_freq = 0;
