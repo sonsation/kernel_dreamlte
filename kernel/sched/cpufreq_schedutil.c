@@ -139,13 +139,14 @@ static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
 	if (sugov_up_down_rate_limit(sg_policy, time, next_freq))
 		return;
 
-	if (sg_policy->next_freq != next_freq) {
-		sg_policy->next_freq = next_freq;
-		sg_policy->last_freq_update_time = time;
-		sg_policy->work_in_progress = true;
-		irq_work_queue_on(&sg_policy->irq_work,
-			sugov_select_scaling_cpu());
-	}
+	if (sg_policy->next_freq == next_freq)
+		return;
+	
+	sg_policy->next_freq = next_freq;
+	sg_policy->last_freq_update_time = time;
+	sg_policy->work_in_progress = true;
+	irq_work_queue_on(&sg_policy->irq_work,
+		sugov_select_scaling_cpu());
 }
 
 #ifdef CONFIG_FREQVAR_SCHEDTUNE
