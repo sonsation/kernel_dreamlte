@@ -475,6 +475,8 @@ fail_init:
 struct freqvar_upscale_ratio {
 	struct freqvar_table *table;
 	int ratio;
+	int cached_ratio;
+	unsigned int freq;
 };
 DEFINE_PER_CPU(struct freqvar_upscale_ratio *, freqvar_upscale_ratio);
 
@@ -488,7 +490,12 @@ unsigned int freqvar_tipping_point(int cpu, unsigned int freq)
 	if (!upscale)
 		return freq + (freq >> 2);
 
-	return freq * 100 / upscale->ratio;
+	if (upscale->ratio != upscale->cached_ratio) {
+		upscale->cached_ratio = upscale->ratio;
+		upscale->freq = freq * 100 / upscale->ratio;
+	}
+
+	return upscale->freq;	
 }
 
 static void freqvar_upscale_ratio_update(int cpu, int new_freq)
@@ -500,6 +507,18 @@ static void freqvar_upscale_ratio_update(int cpu, int new_freq)
 		return;
 
 	upscale->ratio = freqvar_get_value(new_freq, upscale->table);
+	upscale->cached_ratio = upscale->ratio;
+}
+
+static void freqvar_freq_init(int cpu, unsigned int freq)
+{
+	struct freqvar_upscale_ratio *upscale;
+
+	upscale = per_cpu(freqvar_upscale_ratio, cpu);
+	if (!upscale)
+		return;
+
+	upscale->freq = freq * 100 / upscale->ratio;
 }
 
 static void freqvar_upscale_ratio_free(struct freqvar_upscale_ratio *upscale)
@@ -563,6 +582,7 @@ static int freqvar_upscale_ratio_init(struct device_node *dn, const struct cpuma
 		per_cpu(freqvar_upscale_ratio, cpu) = upscale;
 
 	freqvar_upscale_ratio_update(policy->cpu, policy->cur);
+	freqvar_freq_init(policy->cpu, policy->cpuinfo.max_freq);
 
 	ret = sugov_sysfs_add_attr(policy, &freqvar_upscale_ratio_attr.attr);
 	if (ret)
