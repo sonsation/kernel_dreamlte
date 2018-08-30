@@ -17,6 +17,7 @@ struct rt_bandwidth def_rt_bandwidth;
 
 unsigned int sched_switch_to_rt_load_ratio;
 unsigned int sched_switch_to_fair_load_ratio;
+unsigned int sched_rt_remove_ratio_for_freq;
 
 static enum hrtimer_restart sched_rt_period_timer(struct hrtimer *timer)
 {
@@ -2467,6 +2468,29 @@ static ssize_t store_switch_fair_load_ratio(struct kobject *kobj,
 	return count;
 }
 
+static ssize_t show_rt_ratio_for_freq(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	return snprintf(buf, 10, "%u\n", 100 - sched_rt_remove_ratio_for_freq);
+}
+
+static ssize_t store_rt_ratio_for_freq(struct kobject *kobj,
+		struct kobj_attribute *attr, const char *buf,
+		size_t count)
+{
+	int input;
+
+	if (!sscanf(buf, "%d", &input))
+		return -EINVAL;
+
+	input = input < 0 ? 0 : input;
+	input = input > 100 ? 100 : input;
+
+	sched_rt_remove_ratio_for_freq = 100 - input;
+
+	return count;
+}
+
 static struct kobj_attribute switch_fair_load_ratio_attr =
 __ATTR(switch_fair_load_ratio, 0644, show_switch_fair_load_ratio,
 		store_switch_fair_load_ratio);
@@ -2474,6 +2498,10 @@ __ATTR(switch_fair_load_ratio, 0644, show_switch_fair_load_ratio,
 static struct kobj_attribute switch_rt_load_ratio_attr =
 __ATTR(switch_rt_load_ratio, 0644, show_switch_rt_load_ratio,
 		store_switch_rt_load_ratio);
+
+static struct kobj_attribute rt_ratio_for_freq_attr =
+__ATTR(rt_ratio_for_freq, 0644, show_rt_ratio_for_freq,
+		store_rt_ratio_for_freq);
 
 static int find_lowest_rq(struct task_struct *task)
 {
@@ -3046,6 +3074,7 @@ void __init init_sched_rt_class(void)
 #endif
 	sched_switch_to_rt_load_ratio = 0;
 	sched_switch_to_fair_load_ratio = 0;
+	sched_rt_remove_ratio_for_freq = 0;
 }
 #endif /* CONFIG_SMP */
 
@@ -3273,6 +3302,7 @@ static struct attribute *ert_attrs[] = {
 #endif
 	&switch_fair_load_ratio_attr.attr,
 	&switch_rt_load_ratio_attr.attr,
+	&rt_ratio_for_freq_attr.attr,
 	NULL,
 };
 

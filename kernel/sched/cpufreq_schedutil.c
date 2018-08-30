@@ -209,23 +209,22 @@ static bool sugov_cpu_is_busy(struct sugov_cpu *sg_cpu)
 static inline bool sugov_cpu_is_busy(struct sugov_cpu *sg_cpu) { return false; }
 #endif /* CONFIG_NO_HZ_COMMON */
 
+extern unsigned int sched_rt_remove_ratio_for_freq;
+
 static void sugov_get_util(unsigned long *util, unsigned long *max, u64 time)
 {
 	int cpu = smp_processor_id();
-	struct rq *rq = cpu_rq(cpu);
-	unsigned long max_cap, rt;
-	s64 delta;
+	unsigned long max_cap;
+	unsigned long rt_avg = cpu_rq(cpu)->rt.avg.util_avg;
 
  	max_cap = arch_scale_cpu_capacity(NULL, cpu);
 
- 	sched_avg_update(rq);
-	delta = time - rq->age_stamp;
-	if (unlikely(delta < 0))
-		delta = 0;
-	rt = div64_u64(rq->rt_avg, sched_avg_period() + delta);
-	rt = (rt * max_cap) >> SCHED_CAPACITY_SHIFT;
+	*util = boosted_cpu_util(cpu);
 
- 	*util = min(boosted_cpu_util(cpu) + rt, max_cap);
+ 	if (sched_rt_remove_ratio_for_freq)
+		*util -= ((rt_avg * sched_rt_remove_ratio_for_freq) / 100);
+
+ 	*util = min(*util, max_cap);
 	*max = max_cap;
 }
 
