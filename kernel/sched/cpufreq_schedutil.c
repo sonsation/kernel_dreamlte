@@ -65,6 +65,12 @@ struct sugov_cpu {
 	unsigned int iowait_boost_max;
 	u64 last_update;
 
+	/* for store freq. */
+#ifndef CONFIG_FREQVAR_SCHEDTUNE
+	unsigned int max_freq;
+	unsigned int freq;
+#endif
+
 	/* The fields below are only needed when sharing a policy. */
 	unsigned long util;
 	unsigned long max;
@@ -155,9 +161,24 @@ static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
 #ifdef CONFIG_FREQVAR_SCHEDTUNE
 unsigned int freqvar_tipping_point(int cpu, unsigned int freq);
 #else
+static inline unsigned int sugov_cal_freq(unsigned int freq)
+{
+	return freq + (freq >> 2);
+}
+
 static inline unsigned int freqvar_tipping_point(int cpu, unsigned int freq)
 {
-	return  freq + (freq >> 2);
+	struct sugov_cpu *sg_cpu = &per_cpu(sugov_cpu, cpu);
+
+	if (!sg_cpu)
+		return sugov_cal_freq(freq);
+
+	if (sg_cpu->freq != freq) {
+		sg_cpu->freq = freq;
+		sg_cpu->max_freq = sugov_cal_freq(freq);
+	}
+
+	return sg_cpu->max_freq;
 }
 #endif
 
@@ -785,6 +806,10 @@ static int sugov_start(struct cpufreq_policy *policy)
 		memset(sg_cpu, 0, sizeof(*sg_cpu));
 		sg_cpu->sg_policy = sg_policy;
 		sg_cpu->flags = SCHED_CPUFREQ_DL;
+#ifndef CONFIG_FREQVAR_SCHEDTUNE
+		sg_cpu->freq = policy->cpuinfo.max_freq;
+		sg_cpu->max_freq = sugov_cal_freq(policy->cpuinfo.max_freq);
+#endif
 		sg_cpu->iowait_boost_max = policy->cpuinfo.max_freq;
 		cpufreq_add_update_util_hook(cpu, &sg_cpu->update_util,
 						policy_is_shared(policy) ?
