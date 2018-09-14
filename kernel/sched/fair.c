@@ -717,7 +717,8 @@ void init_entity_runnable_average(struct sched_entity *se)
 
 	/* when this task enqueue'ed, it will contribute to its cfs_rq's load_avg */
 #ifdef CONFIG_SCHED_HMP
-	sa->hmp_load_avg = 0;
+	if (entity_is_task(se))
+		sa->hmp_load_avg = 0;
 	sa->hmp_load_sum = 0;
 #endif
 }
