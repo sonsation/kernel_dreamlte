@@ -689,7 +689,6 @@ static unsigned long task_h_load(struct task_struct *p);
 /* Give new sched_entity start runnable values to heavy its load in infant time */
 void init_entity_runnable_average(struct sched_entity *se)
 {
-	struct task_struct *p = current;
 	struct sched_avg *sa = &se->avg;
 
 	sa->last_update_time = 0;
@@ -711,8 +710,8 @@ void init_entity_runnable_average(struct sched_entity *se)
 
 	/* when this task enqueue'ed, it will contribute to its cfs_rq's load_avg */
 #ifdef CONFIG_SCHED_HMP
-	sa->hmp_load_avg = p->se.avg.hmp_load_avg;
-	sa->hmp_load_sum = p->se.avg.hmp_load_sum;
+	sa->hmp_load_avg = 0;
+	sa->hmp_load_sum = 0;
 #endif
 }
 
