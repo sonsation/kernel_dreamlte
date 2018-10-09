@@ -3052,17 +3052,18 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 		scaled_delta_w = cap_scale(delta_w, scale_freq);
 		if (weight) {
 			sa->load_sum += weight * scaled_delta_w;
-#ifdef CONFIG_SCHED_HMP
-			sa->hmp_load_sum += scaled_delta_w;
-#endif
+
 			if (cfs_rq) {
 				cfs_rq->runnable_load_sum +=
 						weight * scaled_delta_w;
 			}
 		}
-		if (running)
+		if (running) {
 			sa->util_sum += scaled_delta_w * scale_cpu;
-
+#ifdef CONFIG_SCHED_HMP
+			sa->hmp_load_sum += scaled_delta_w;
+#endif
+		}
 		delta -= delta_w;
 
 		/* Figure out how many additional periods this update spans */
@@ -3084,30 +3085,32 @@ __update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 		contrib = cap_scale(contrib, scale_freq);
 		if (weight) {
 			sa->load_sum += weight * contrib;
-#ifdef CONFIG_SCHED_HMP
-			sa->hmp_load_sum += contrib;
-#endif
+
 			if (cfs_rq)
 				cfs_rq->runnable_load_sum += weight * contrib;
 		}
-		if (running)
+		if (running) {
 			sa->util_sum += contrib * scale_cpu;
+#ifdef CONFIG_SCHED_HMP
+			sa->hmp_load_sum += contrib;
+#endif
+		}
 	}
 
 	/* Remainder of delta accrued against u_0` */
 	scaled_delta = cap_scale(delta, scale_freq);
 	if (weight) {
 		sa->load_sum += weight * scaled_delta;
-#ifdef CONFIG_SCHED_HMP
-		sa->hmp_load_sum += scaled_delta;
-#endif
 
 		if (cfs_rq)
 			cfs_rq->runnable_load_sum += weight * scaled_delta;
 	}
-	if (running)
+	if (running) {
 		sa->util_sum += scaled_delta * scale_cpu;
-
+#ifdef CONFIG_SCHED_HMP
+		sa->hmp_load_sum += scaled_delta;
+#endif
+	}
 	sa->period_contrib += delta;
 
 	if (decayed) {
