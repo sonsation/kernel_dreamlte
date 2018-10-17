@@ -1964,11 +1964,9 @@ static unsigned long capacity_orig_of(int cpu)
  */
 static inline unsigned long cpu_util(int cpu)
 {
-	unsigned long util;
-	unsigned long capacity = capacity_orig_of(cpu);
 	struct cfs_rq *cfs_rq = &cpu_rq(cpu)->cfs;
-
-	util = cfs_rq->avg.util_avg;
+	unsigned long util = cfs_rq->avg.util_avg;
+	unsigned long capacity = capacity_orig_of(cpu);
 	
 	if (sched_feat(UTIL_EST))
 		util = max_t(unsigned long, util, READ_ONCE(cfs_rq->avg.util_est.enqueued));

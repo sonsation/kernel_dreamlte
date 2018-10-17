@@ -236,20 +236,15 @@ extern unsigned int sched_rt_remove_ratio_for_freq;
 static void sugov_get_util(unsigned long *util, unsigned long *max, u64 time)
 {
 	int cpu = smp_processor_id();
-	unsigned long max_cap;
-	unsigned long rt_avg = cpu_rq(cpu)->rt.avg.util_avg;
+	unsigned long max_cap, rt_avg;
 
- 	max_cap = arch_scale_cpu_capacity(NULL, cpu);
+	max_cap = arch_scale_cpu_capacity(NULL, cpu);
 
-	*util = boosted_cpu_util(cpu);
-	
-	if (sched_feat(UTIL_EST)) {
-		*util = max_t(unsigned long, *util,
-			     READ_ONCE(cpu_rq(cpu)->cfs.avg.util_est.enqueued));
-	}
-
- 	if (sched_rt_remove_ratio_for_freq)
+	*util = boosted_cpu_util(cpu);	
+ 	if (sched_rt_remove_ratio_for_freq) {
+		rt_avg = cpu_rq(cpu)->rt.avg.util_avg;
 		*util -= ((rt_avg * sched_rt_remove_ratio_for_freq) / 100);
+	}
 
  	*util = min(*util, max_cap);
 	*max = max_cap;
