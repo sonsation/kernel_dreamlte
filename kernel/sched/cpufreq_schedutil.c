@@ -323,6 +323,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	busy = sugov_cpu_is_busy(sg_cpu);
 
 	if (flags & SCHED_CPUFREQ_DL) {
+		sg_policy->cached_raw_freq = 0;
 		next_f = policy->cpuinfo.max_freq;
 	} else {
 		sugov_get_util(&util, &max, time);
@@ -373,8 +374,10 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 			continue;
 		}
 
-		if (j_sg_cpu->flags & SCHED_CPUFREQ_DL)
+		if (j_sg_cpu->flags & SCHED_CPUFREQ_DL) {
+			sg_policy->cached_raw_freq = 0;
 			return policy->cpuinfo.max_freq;
+		}
 
 		j_util = j_sg_cpu->util;
 		j_max = j_sg_cpu->max;
