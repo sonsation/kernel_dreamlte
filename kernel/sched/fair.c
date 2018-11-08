@@ -5619,8 +5619,6 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p,
 	unsigned long most_spare = 0, this_spare = 0;
 	int load_idx = sd->forkexec_idx;
 	int imbalance = 100 + (sd->imbalance_pct-100)/2;
-	struct sched_group *fit_group = NULL;
-	unsigned long fit_capacity = ULONG_MAX;
 
 	if (sd_flag & SD_BALANCE_WAKE)
 		load_idx = sd->wake_idx;
@@ -5691,9 +5689,6 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p,
 		return NULL;
 	else if (most_spare > task_util(p) / 2)
 		return most_spare_sg;
-
-	if (fit_group)
-		return fit_group;
 
 	if (!idlest || 100*this_load < imbalance*min_load)
 		return NULL;
