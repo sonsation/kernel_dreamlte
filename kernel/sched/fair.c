@@ -5582,7 +5582,23 @@ static inline bool task_fits_spare(struct task_struct *p, int cpu)
 	return __task_fits(p, cpu, cpu_util(cpu));
 }
 
-static int cpu_util_wake(int cpu, struct task_struct *p);
+/*
+ * cpu_util_wake: Compute cpu utilization with any contributions from
+ * the waking task p removed.
+ */
+static int cpu_util_wake(int cpu, struct task_struct *p)
+{
+	unsigned long util, capacity;
+
+	/* Task has no contribution or is new */
+	if (cpu != task_cpu(p) || !p->se.avg.last_update_time)
+		return cpu_util(cpu);
+
+	capacity = capacity_orig_of(cpu);
+	util = max_t(long, cpu_util(cpu) - task_util(p), 0);
+
+	return (util >= capacity) ? capacity : util;
+}
 
 static unsigned long capacity_spare_wake(int cpu, struct task_struct *p)
 {
