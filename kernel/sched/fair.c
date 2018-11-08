@@ -5792,14 +5792,8 @@ find_idlest_group_cpu(struct sched_group *group, struct task_struct *p, int this
 static inline int find_idlest_cpu(struct sched_domain *sd, struct task_struct *p,
 				  int cpu, int prev_cpu, int sd_flag)
 {
-	int wu = sd_flag & SD_BALANCE_WAKE;
 	int cas_cpu = -1;
 	int new_cpu = cpu;
-
-	if (wu) {
-		schedstat_inc(p->se.statistics.nr_wakeups_cas_attempts);
-		schedstat_inc(this_rq()->eas_stats.cas_attempts);
-	}
 
 	if (!cpumask_intersects(sched_domain_span(sd), &p->cpus_allowed))
 		return prev_cpu;
@@ -5808,9 +5802,6 @@ static inline int find_idlest_cpu(struct sched_domain *sd, struct task_struct *p
 		struct sched_group *group;
 		struct sched_domain *tmp;
 		int weight;
-
-		if (wu)
-			schedstat_inc(sd->eas_stats.cas_attempts);
 
 		if (!(sd->flags & sd_flag)) {
 			sd = sd->child;
@@ -5841,11 +5832,6 @@ static inline int find_idlest_cpu(struct sched_domain *sd, struct task_struct *p
 				sd = tmp;
 		}
 		/* while loop will break here if sd == NULL */
-	}
-
-	if (wu && (cas_cpu >= 0)) {
-		schedstat_inc(p->se.statistics.nr_wakeups_cas_count);
-		schedstat_inc(this_rq()->eas_stats.cas_count);
 	}
 
 	return new_cpu;
