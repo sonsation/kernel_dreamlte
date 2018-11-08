@@ -5792,7 +5792,6 @@ find_idlest_group_cpu(struct sched_group *group, struct task_struct *p, int this
 static inline int find_idlest_cpu(struct sched_domain *sd, struct task_struct *p,
 				  int cpu, int prev_cpu, int sd_flag)
 {
-	int cas_cpu = -1;
 	int new_cpu = cpu;
 
 	if (!cpumask_intersects(sched_domain_span(sd), &p->cpus_allowed))
@@ -5822,7 +5821,7 @@ static inline int find_idlest_cpu(struct sched_domain *sd, struct task_struct *p
 		}
 
 		/* Now try balancing at a lower domain level of new_cpu */
-		cpu = cas_cpu = new_cpu;
+		cpu = new_cpu;
 		weight = sd->span_weight;
 		sd = NULL;
 		for_each_domain(cpu, tmp) {
