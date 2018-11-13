@@ -6365,12 +6365,16 @@ static inline void hmp_load_compensation(struct sched_entity *se, u64 compst_rat
 static inline void hmp_load_migration(struct sched_entity * se,
 							int src, int dst)
 {
+	u64 compst_ratio = 0;
+
 	/* To Check whether dst cpu is one of the src cluster or not */
 	if (cpumask_test_cpu(dst, cpu_coregroup_mask(src)))
 		return;
 
-	if (hmp_cpu_is_fastest(dst))
-		hmp_load_compensation(se, hmp_up_compst_ratio);	
+	compst_ratio = hmp_cpu_is_fastest(dst) ? hmp_up_compst_ratio
+					       : hmp_down_compst_ratio;
+
+	hmp_load_compensation(se, compst_ratio);
 }
 #endif
 
