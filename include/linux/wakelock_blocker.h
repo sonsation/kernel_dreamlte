@@ -23,7 +23,7 @@
 #define MAJOR_VERSION "1.0"
 #define MAX_NAME_LEN  255
 #define DEFAULT_ENABLED true
-#define DEFAULT_LIST "wlan_rx_wake wlan_ctrl_wake wlan_wake NETLINK wlan_txfl_wake bluetooth_timer BT_host_wake BT_bt_wake mmc0_detect"
+#define DEFAULT_LIST "bbd_wake_lock ssp_wake_lock ssp_comm_wake_lock wlan_rx_wake wlan_wake wlan_ctrl_wake NETLINK wlan_txfl_wake bluetooth_timer BT_bt_wake BT_host_wake mmc0_detect"
 
 struct wake_item {
 	char wake_name[MAX_NAME_LEN];
