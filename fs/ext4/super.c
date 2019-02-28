@@ -4014,10 +4014,11 @@ no_journal:
 				ext4_sec_r_blocks_count(es) >>
 				sbi->s_cluster_bits);
 
-	if (le32_to_cpu(es->s_sec_magic) == EXT4_SEC_DATA_MAGIC) {
+	if (le32_to_cpu(es->s_sec_magic) == EXT4_SEC_DATA_MAGIC ||
+			strncmp(es->s_volume_name, "data", 4) == 0) {
 		sbi->s_r_inodes_count = EXT4_DEF_RESERVE_INODE;
 		ext4_msg(sb, KERN_INFO, "Reserve inodes (%d/%u)",
-			EXT4_DEF_RESERVE_INODE,
+			EXT4_DEF_RESERVE_INODE * 2,
 			le32_to_cpu(es->s_inodes_count));
 	}
 

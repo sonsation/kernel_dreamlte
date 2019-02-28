@@ -84,6 +84,10 @@
 #include <linux/msg.h>
 #include <linux/shm.h>
 
+#ifdef CONFIG_LOD_SEC
+#include <linux/linux_on_dex.h>
+#endif
+
 #include "avc.h"
 #include "objsec.h"
 #include "netif.h"
@@ -93,6 +97,14 @@
 #include "netlabel.h"
 #include "audit.h"
 #include "avc_ss.h"
+
+#ifdef CONFIG_LOD_SEC
+#ifdef CONFIG_RKP_KDP
+#define rkp_is_lod_cred(x) ((x->type)>>3 & 1)
+#else
+#define rkp_is_lod_cred(x) (uid_is_LOD(x->uid.val) || (strcmp(current->comm, "nst") == 0 && x->uid.val == 0))
+#endif  /* CONFIG_RKP_KDP */
+#endif  /* CONFIG_LOD_SEC */
 
 #ifdef CONFIG_RKP_NS_PROT
 extern unsigned int cmp_ns_integrity(void);
@@ -176,7 +188,6 @@ unsigned int rkp_get_offset_bp_cred(void)
 /* SECMARK reference count */
 static atomic_t selinux_secmark_refcount = ATOMIC_INIT(0);
 
-#ifdef CONFIG_SECURITY_SELINUX_DEVELOP
 int selinux_enforcing;
 
 static int __init enforcing_setup(char *str)
@@ -184,11 +195,10 @@ static int __init enforcing_setup(char *str)
 	unsigned long enforcing;
 	if (!kstrtoul(str, 0, &enforcing))
 		selinux_enforcing = enforcing ? 1 : 0;
+
 	return 1;
 }
 __setup("enforcing=", enforcing_setup);
-#endif
-
 #ifdef CONFIG_SECURITY_SELINUX_BOOTPARAM
 RKP_RO_AREA int selinux_enabled = CONFIG_SECURITY_SELINUX_BOOTPARAM_VALUE;
 
@@ -427,6 +437,18 @@ static void superblock_free_security(struct super_block *sb)
 	kfree(sbsec);
 }
 
+/* The file system's label must be initialized prior to use. */
+
+static const char *labeling_behaviors[7] = {
+	"uses xattr",
+	"uses transition SIDs",
+	"uses task SIDs",
+	"uses genfs_contexts",
+	"not configured for labeling",
+	"uses mountpoint labeling",
+	"uses native labeling",
+};
+
 static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dentry);
 
 static inline int inode_doinit(struct inode *inode)
@@ -538,6 +560,10 @@ static int sb_finish_set_opts(struct super_block *sb)
 			goto out;
 		}
 	}
+
+	if (sbsec->behavior > ARRAY_SIZE(labeling_behaviors))
+		printk(KERN_ERR "SELinux: initialized (dev %s, type %s), unknown behavior\n",
+		       sb->s_id, sb->s_type->name);
 
 	sbsec->flags |= SE_SBINITIALIZED;
 	if (selinux_is_sblabel_mnt(sb))
@@ -822,6 +848,7 @@ static int selinux_set_mnt_opts(struct super_block *sb,
 		sbsec->flags |= SE_SBPROC | SE_SBGENFS;
 
 	if (!strcmp(sb->s_type->name, "debugfs") ||
+	    !strcmp(sb->s_type->name, "tracefs") ||
 	    !strcmp(sb->s_type->name, "sysfs") ||
 	    !strcmp(sb->s_type->name, "pstore"))
 		sbsec->flags |= SE_SBGENFS;
@@ -1680,7 +1707,7 @@ static int current_has_perm(const struct task_struct *tsk,
 
 /* Check whether a task is allowed to use a capability. */
 static int cred_has_capability(const struct cred *cred,
-			       int cap, int audit)
+			       int cap, int audit, bool initns)
 {
 	struct common_audit_data ad;
 	struct av_decision avd;
@@ -1694,10 +1721,26 @@ static int cred_has_capability(const struct cred *cred,
 
 	switch (CAP_TO_INDEX(cap)) {
 	case 0:
-		sclass = SECCLASS_CAPABILITY;
+#if defined(CONFIG_LOD_SEC)
+		if (!initns && rkp_is_lod_cred(cred)) {
+			sclass = SECCLASS_CAP_LOD;
+		} else {
+			sclass = initns ? SECCLASS_CAPABILITY : SECCLASS_CAP_USERNS;
+		}
+#else
+		sclass = initns ? SECCLASS_CAPABILITY : SECCLASS_CAP_USERNS;
+#endif
 		break;
 	case 1:
-		sclass = SECCLASS_CAPABILITY2;
+#if defined(CONFIG_LOD_SEC)
+		if (!initns && rkp_is_lod_cred(cred)) {
+			sclass = SECCLASS_CAP2_LOD;
+		} else {
+			sclass = initns ? SECCLASS_CAPABILITY2 : SECCLASS_CAP2_USERNS;
+		}
+#else
+		sclass = initns ? SECCLASS_CAPABILITY2 : SECCLASS_CAP2_USERNS;
+#endif
 		break;
 	default:
 		printk(KERN_ERR
@@ -2077,9 +2120,8 @@ static inline u32 file_to_av(struct file *file)
 static inline u32 open_file_to_av(struct file *file)
 {
 	u32 av = file_to_av(file);
-	struct inode *inode = file_inode(file);
 
-	if (selinux_policycap_openperm && inode->i_sb->s_magic != SOCKFS_MAGIC)
+	if (selinux_policycap_openperm)
 		av |= FILE__OPEN;
 
 	return av;
@@ -2249,7 +2291,8 @@ static int selinux_capable(const struct cred *cred, struct user_namespace *ns,
 	if ((rc = security_integrity_current()))
 		return rc;
 #endif  /* CONFIG_RKP_KDP */
-	return cred_has_capability(cred, cap, audit);
+
+	return cred_has_capability(cred, cap, audit, ns == &init_user_ns);
 }
 
 static int selinux_quotactl(int cmds, int type, int id, struct super_block *sb)
@@ -2342,7 +2385,7 @@ static int selinux_vm_enough_memory(struct mm_struct *mm, long pages)
 #endif  /* CONFIG_RKP_KDP */
 
 	rc = cred_has_capability(current_cred(), CAP_SYS_ADMIN,
-					SECURITY_CAP_NOAUDIT);
+					SECURITY_CAP_NOAUDIT, true);
 	if (rc == 0)
 		cap_sys_admin = 1;
 
@@ -2902,8 +2945,9 @@ static int selinux_sb_kern_mount(struct super_block *sb, int flags, void *data)
 
 #ifdef CONFIG_RKP_KDP	
 	if ((rc = security_integrity_current()))
-		goto out;
+		return rc;
 #endif  /* CONFIG_RKP_KDP */
+
 	rc = superblock_doinit(sb, data);
 	if (rc)
 		goto out;
@@ -3259,7 +3303,6 @@ static int selinux_inode_permission(struct inode *inode, int mask)
 static int selinux_inode_setattr(struct dentry *dentry, struct iattr *iattr)
 {
 	const struct cred *cred = current_cred();
-	struct inode *inode = d_backing_inode(dentry);
 	unsigned int ia_valid = iattr->ia_valid;
 	__u32 av = FILE__WRITE;
 #ifdef CONFIG_RKP_KDP
@@ -3280,10 +3323,8 @@ static int selinux_inode_setattr(struct dentry *dentry, struct iattr *iattr)
 			ATTR_ATIME_SET | ATTR_MTIME_SET | ATTR_TIMES_SET))
 		return dentry_has_perm(cred, dentry, FILE__SETATTR);
 
-	if (selinux_policycap_openperm &&
-	    inode->i_sb->s_magic != SOCKFS_MAGIC &&
-	    (ia_valid & ATTR_SIZE) &&
-	    !(ia_valid & ATTR_FILE))
+	if (selinux_policycap_openperm && (ia_valid & ATTR_SIZE)
+			&& !(ia_valid & ATTR_FILE))
 		av |= FILE__OPEN;
 
 	return dentry_has_perm(cred, dentry, av);
@@ -3507,7 +3548,7 @@ static int selinux_inode_getsecurity(const struct inode *inode, const char *name
 			    SECURITY_CAP_NOAUDIT);
 	if (!error)
 		error = cred_has_capability(current_cred(), CAP_MAC_ADMIN,
-					    SECURITY_CAP_NOAUDIT);
+					    SECURITY_CAP_NOAUDIT, true);
 	if (!error)
 		error = security_sid_to_context_force(isec->sid, &context,
 						      &size);
@@ -3719,7 +3760,7 @@ static int selinux_file_ioctl(struct file *file, unsigned int cmd,
 	case KDSKBENT:
 	case KDSKBSENT:
 		error = cred_has_capability(cred, CAP_SYS_TTY_CONFIG,
-					    SECURITY_CAP_AUDIT);
+					    SECURITY_CAP_AUDIT, true);
 		break;
 
 	/* default case assumes that the command will go
@@ -4653,8 +4694,6 @@ static int sock_has_perm(struct task_struct *task, struct sock *sk, u32 perms)
 	struct lsm_network_audit net = {0,};
 	u32 tsid = task_sid(task);
 
-	if (!sksec)
-		return -EFAULT;
 	if (sksec->sid == SECINITSID_KERNEL)
 		return 0;
 
@@ -4760,18 +4799,10 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 		u32 sid, node_perm;
 
 		if (family == PF_INET) {
-			if (addrlen < sizeof(struct sockaddr_in)) {
-				err = -EINVAL;
-				goto out;
-			}
 			addr4 = (struct sockaddr_in *)address;
 			snum = ntohs(addr4->sin_port);
 			addrp = (char *)&addr4->sin_addr.s_addr;
 		} else {
-			if (addrlen < SIN6_LEN_RFC2133) {
-				err = -EINVAL;
-				goto out;
-			}
 			addr6 = (struct sockaddr_in6 *)address;
 			snum = ntohs(addr6->sin6_port);
 			addrp = (char *)&addr6->sin6_addr.s6_addr;
@@ -7116,6 +7147,7 @@ static __init int selinux_init(void)
 
 	if (!security_module_enable("selinux")) {
 		selinux_enabled = 0;
+
 		return 0;
 	}
 
@@ -7143,6 +7175,7 @@ static __init int selinux_init(void)
 
 	if (avc_add_callback(selinux_netcache_avc_callback, AVC_CALLBACK_RESET))
 		panic("SELinux: Unable to register AVC netcache callback\n");
+
 	if (selinux_enforcing)
 		printk(KERN_DEBUG "SELinux:  Starting in enforcing mode\n");
 	else
