@@ -211,8 +211,6 @@ void print_cfs_rq(struct seq_file *m, int cpu, struct cfs_rq *cfs_rq)
 			cfs_rq->runnable_load_avg);
 	SEQ_printf(m, "  .%-30s: %lu\n", "util_avg",
 			cfs_rq->avg.util_avg);
-	SEQ_printf(m, "  .%-30s: %u\n", "util_est_enqueued",
-			cfs_rq->avg.util_est.enqueued);
 #ifdef CONFIG_SCHED_HMP
 	SEQ_printf(m, "  .%-30s: %llu\n", "hmp_load_avg",
 			cfs_rq->avg.hmp_load_avg);
@@ -664,8 +662,6 @@ void proc_sched_show_task(struct task_struct *p, struct seq_file *m)
 	P(se.avg.load_avg);
 	P(se.avg.util_avg);
 	P(se.avg.last_update_time);
-	P(se.avg.util_est.ewma);
-	P(se.avg.util_est.enqueued);
 #ifdef CONFIG_SCHED_HMP
 	P(se.avg.hmp_load_avg);
 #endif
